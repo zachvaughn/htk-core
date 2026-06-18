@@ -6,7 +6,8 @@ Supports FreeTrack and TrackIR-compatible input and output protocols.
 > This project is being actively developed and still heavily work in progress, but is functional overall.
 
 ## Screenshots
-<img width="1212" height="844" alt="htk" src="https://github.com/user-attachments/assets/3edafca1-e115-4c26-a8ef-95769781f507" />
+<img width="1212" height="844" alt="htk" src="https://github.com/user-attachments/assets/a78718d1-ccd5-4518-ae93-4c3a375a9803" />
+
 
 
 ## Features
