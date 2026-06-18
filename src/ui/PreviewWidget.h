@@ -55,7 +55,6 @@ namespace htk::ui {
         void drawTrackingInfo(QPainter& painter);
 
         // Draw head orientation indicator
-        void drawHeadIndicator(QPainter& painter);
         void draw3DHeadVisualization(QPainter& painter);
     };
 

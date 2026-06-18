@@ -178,30 +178,6 @@ void PreviewWidget::drawTrackingInfo(QPainter& painter) {
     drawHeadIndicator(painter);
 }
 
-void PreviewWidget::drawHeadIndicator(QPainter& painter) {
-    int centerX = width() - 100;
-    int centerY = height() - 100;
-    int size = 60;
-
-    TrackingData data = m_tracker->getCurrentData();
-
-    float yawRad   = data.yaw   * static_cast<float>(M_PI) / 180.0f;
-    float pitchRad = data.pitch * static_cast<float>(M_PI) / 180.0f;
-
-    painter.setPen(QPen(Qt::white, 2));
-    painter.drawEllipse(QPoint(centerX, centerY), size / 2, size / 2);
-
-    float noseX = centerX + (size / 2.0f) * std::sin(yawRad) * std::cos(pitchRad);
-    float noseY = centerY - (size / 2.0f) * std::sin(pitchRad);
-
-    painter.setPen(QPen(Qt::red, 3));
-    painter.drawLine(QPointF(centerX, centerY), QPointF(noseX, noseY));
-
-    painter.setPen(Qt::white);
-    painter.setFont(QFont("Arial", 10));
-    painter.drawText(centerX - 30, height() - 20, "Head Pose");
-}
-
 QImage PreviewWidget::cvMatToQImage(const cv::Mat& mat) {
     if (mat.empty()) {
         return QImage();

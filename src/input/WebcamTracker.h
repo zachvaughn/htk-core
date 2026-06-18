@@ -40,6 +40,10 @@ namespace htk::input {
         cv::Mat m_currentFrame;
         cv::Rect m_lastFaceRect;
 
+        cv::Mat m_prevGray;
+        std::vector<cv::Point2f> m_prevPoints;
+        bool m_isOpticalFlowActive = false;
+
         htk::core::TrackingData m_trackingData;
         htk::core::TrackingData m_centerPosition;
 
@@ -51,6 +55,8 @@ namespace htk::input {
         bool detectFace(const cv::Mat& frame, cv::Rect& faceRect);
         void estimatePose(const cv::Rect& faceRect);
         void smoothData(htk::core::TrackingData& data);
+        void initializeFeatures(const cv::Mat& grayFrame, const cv::Rect& faceRect);
+        bool trackOpticalFlow(const cv::Mat& grayFrame);
     };
 
 } // namespace htk::input

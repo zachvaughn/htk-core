@@ -62,36 +62,112 @@ WebcamTracker::~WebcamTracker() {
 }
 
 bool WebcamTracker::update() {
-    if (!m_isInitialized || !m_camera.isOpened()) {
+    if (!m_isInitialized || !m_camera.read(m_currentFrame) || m_currentFrame.empty()) {
         return false;
     }
 
-    // Capture frame
-    if (!m_camera.read(m_currentFrame)) {
-        std::cerr << "Failed to read frame from camera" << std::endl;
-        return false;
+    cv::Mat gray;
+    cv::cvtColor(m_currentFrame, gray, cv::COLOR_BGR2GRAY);
+    cv::equalizeHist(gray, gray);
+
+    bool trackingSuccess = false;
+
+    // optical flow
+    if (m_isOpticalFlowActive && !m_prevPoints.empty()) {
+        trackingSuccess = trackOpticalFlow(gray);
     }
 
-    if (m_currentFrame.empty()) {
-        return false;
+    // fallback to Haar Cascade if flow failed or hasn't started
+    if (!trackingSuccess) {
+        cv::Rect faceRect;
+        if (detectFace(m_currentFrame, faceRect)) {
+            m_lastFaceRect = faceRect;
+            estimatePose(faceRect); // base estimation
+            initializeFeatures(gray, faceRect); // lock new points
+
+            m_isOpticalFlowActive = true;
+            trackingSuccess = true;
+            m_trackingData.isValid = true;
+            m_trackingData.confidence = 1.0f;
+        } else {
+            m_isOpticalFlowActive = false;
+            m_trackingData.isValid = false;
+            m_trackingData.confidence = 0.0f;
+        }
     }
 
-    // Detect face
-    cv::Rect faceRect;
-    if (detectFace(m_currentFrame, faceRect)) {
-        m_lastFaceRect = faceRect;
-        estimatePose(faceRect);
-        m_isTracking = true;
-        m_trackingData.isValid = true;
-        m_trackingData.confidence = 1.0f;
-    } else {
-        m_isTracking = false;
-        m_trackingData.isValid = false;
-        m_trackingData.confidence = 0.0f;
-    }
-
+    m_prevGray = gray.clone();
     m_trackingData.timestamp = htk::core::TrackingData::now();
+    m_isTracking = trackingSuccess;
 
+    return true;
+}
+
+void WebcamTracker::initializeFeatures(const cv::Mat& grayFrame, const cv::Rect& faceRect) {
+    // restrict feature finding to the upper half of the face
+    cv::Rect roi = faceRect;
+    roi.height = roi.height * 0.6;
+
+    // ensure ROI is within bounds
+    roi &= cv::Rect(0, 0, grayFrame.cols, grayFrame.rows);
+
+    cv::Mat mask = cv::Mat::zeros(grayFrame.size(), CV_8U);
+    mask(roi) = 255;
+
+    // find the strongest corners
+    cv::goodFeaturesToTrack(grayFrame, m_prevPoints, 50, 0.01, 10, mask);
+}
+
+bool WebcamTracker::trackOpticalFlow(const cv::Mat& grayFrame) {
+    std::vector<cv::Point2f> nextPoints;
+    std::vector<uchar> status;
+    std::vector<float> err;
+
+    // calculate optical flow
+    cv::calcOpticalFlowPyrLK(
+        m_prevGray, grayFrame,
+        m_prevPoints, nextPoints,
+        status, err,
+        cv::Size(21, 21), 3 // window size
+    );
+
+    // calculate average movement
+    float dx = 0.0f;
+    float dy = 0.0f;
+    int goodPointsCount = 0;
+
+    std::vector<cv::Point2f> goodPoints;
+    for (size_t i = 0; i < m_prevPoints.size(); i++) {
+        // if point was tracked successfully and didn't jump insanely far
+        if (status[i] && err[i] < 30.0f) {
+            dx += (nextPoints[i].x - m_prevPoints[i].x);
+            dy += (nextPoints[i].y - m_prevPoints[i].y);
+            goodPoints.push_back(nextPoints[i]);
+            goodPointsCount++;
+        }
+    }
+
+    // force a Haar re-detection if points lost
+    if (goodPointsCount < 10) {
+        return false;
+    }
+
+    dx /= goodPointsCount;
+    dy /= goodPointsCount;
+
+    // apply movement
+    float newYaw = m_trackingData.yaw - (dx * 0.5f);
+    float newPitch = m_trackingData.pitch - (dy * 0.5f);
+
+    // apply smoothing
+    m_trackingData.yaw = m_trackingData.yaw * m_smoothingFactor + newYaw * (1.0f - m_smoothingFactor);
+    m_trackingData.pitch = m_trackingData.pitch * m_smoothingFactor + newPitch * (1.0f - m_smoothingFactor);
+
+    // update X/Y translation similarly
+    m_trackingData.x += (dx * 1.5f);
+    m_trackingData.y += (dy * 1.5f);
+
+    m_prevPoints = goodPoints;
     return true;
 }
 
