@@ -174,8 +174,6 @@ void PreviewWidget::drawTrackingInfo(QPainter& painter) {
                                  Qt::red;
 
     painter.fillRect(confidenceFill, fillColor);
-
-    drawHeadIndicator(painter);
 }
 
 QImage PreviewWidget::cvMatToQImage(const cv::Mat& mat) {
