@@ -118,15 +118,15 @@ void HeadTracker::shutdown() {
     std::cout << "Head-Tracking Kit shutdown complete" << std::endl;
 }
 
-void HeadTracker::recenter() {
+    void HeadTracker::recenter() {
     std::lock_guard<std::mutex> lock(m_dataMutex);
 
-    // Store current position as center offset
-    m_centerOffset = m_currentData;
+    // capture the absolute un-offset data directly from the source
+    m_centerOffset = m_webcamTracker->getTrackingData();
 
-    std::cout << "Recentered at: yaw="   << m_centerOffset.yaw
-              << " pitch="              << m_centerOffset.pitch
-              << " roll="               << m_centerOffset.roll
+    std::cout << "Recentered absolute zero to: yaw=" << m_centerOffset.yaw
+              << " pitch=" << m_centerOffset.pitch
+              << " roll="  << m_centerOffset.roll
               << std::endl;
 }
 

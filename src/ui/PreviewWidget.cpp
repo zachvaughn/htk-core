@@ -53,29 +53,82 @@ void PreviewWidget::updateFrame() {
     update();
 }
 
-void PreviewWidget::paintEvent(QPaintEvent* event) {
+    void PreviewWidget::paintEvent(QPaintEvent* event) {
     Q_UNUSED(event);
 
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
 
-    // Draw camera feed if available
-    if (!m_currentImage.isNull()) {
-        QRect imageRect = m_currentImage.rect();
-        QRect targetRect = rect();
-
-        imageRect.moveCenter(targetRect.center());
-        painter.drawImage(imageRect, m_currentImage);
-    }
-
-    // Draw tracking info overlay
+    // draw a grid background and the 3D position visualization
     if (m_tracker && m_tracker->isRunning()) {
         drawTrackingInfo(painter);
+
+        // draw the 3D center head visualization
+        draw3DHeadVisualization(painter);
     } else {
         painter.setPen(Qt::white);
         painter.setFont(QFont("Arial", 16));
         painter.drawText(rect(), Qt::AlignCenter, "No tracking active");
     }
+}
+
+    void PreviewWidget::draw3DHeadVisualization(QPainter& painter) {
+    TrackingData data = m_tracker->getCurrentData();
+    if (!data.isValid) return;
+
+    // center of the screen
+    int cx = width() / 2;
+    int cy = height() / 2;
+
+    // apply X and Y translations
+    cx += static_cast<int>(data.x);
+    cy += static_cast<int>(data.y);
+
+    // dynamic scale based on Z distance
+    float zScale = 1.0f - (data.z / 300.0f);
+    if (zScale < 0.2f) zScale = 0.2f;
+
+    float boxSize = 80.0f * zScale;
+
+    // convert angles to radians
+    float yawRad   = data.yaw   * static_cast<float>(M_PI) / 180.0f;
+    float pitchRad = data.pitch * static_cast<float>(M_PI) / 180.0f;
+    float rollRad  = data.roll  * static_cast<float>(M_PI) / 180.0f;
+
+    painter.save();
+    painter.translate(cx, cy);
+    painter.rotate(data.roll);
+
+    // compute front face offset based on yaw and pitch
+    float dx = (boxSize / 2.0f) * std::sin(yawRad);
+    float dy = -(boxSize / 2.0f) * std::sin(pitchRad);
+
+    // draw reference depth
+    painter.setPen(QPen(QColor(255, 255, 255, 40), 1, Qt::DashLine));
+    painter.drawLine(-width(), 0, width(), 0);
+    painter.drawLine(0, -height(), 0, height());
+
+    // draw back
+    painter.setPen(QPen(Qt::cyan, 2));
+    painter.drawRect(QRectF(-boxSize / 2, -boxSize / 2, boxSize, boxSize));
+
+    // draw connecting depth lines
+    painter.setPen(QPen(QColor(0, 255, 255, 100), 1, Qt::DotLine));
+    painter.drawLine(-boxSize/2, -boxSize/2, -boxSize/2 + dx, -boxSize/2 + dy);
+    painter.drawLine(boxSize/2, -boxSize/2, boxSize/2 + dx, -boxSize/2 + dy);
+    painter.drawLine(-boxSize/2, boxSize/2, -boxSize/2 + dx, boxSize/2 + dy);
+    painter.drawLine(boxSize/2, boxSize/2, boxSize/2 + dx, boxSize/2 + dy);
+
+    // draw front face
+    painter.setPen(QPen(Qt::green, 3));
+    painter.setBrush(QColor(0, 255, 0, 30));
+    painter.drawRect(QRectF(-boxSize / 2 + dx, -boxSize / 2 + dy, boxSize, boxSize));
+
+    // draw a nose indicator
+    painter.setPen(QPen(Qt::red, 3));
+    painter.drawLine(QPointF(dx, dy), QPointF(dx + dx * 0.5f, dy + dy * 0.5f));
+
+    painter.restore();
 }
 
 void PreviewWidget::drawTrackingInfo(QPainter& painter) {
